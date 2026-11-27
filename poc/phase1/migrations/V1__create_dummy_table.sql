@@ -1,0 +1,5 @@
+CREATE TABLE poc_phase1_test (
+    id SERIAL PRIMARY KEY,
+    test_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
