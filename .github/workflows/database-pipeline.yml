@@ -69,6 +69,24 @@ jobs:
 
           echo "All SQL files contain content."
 
+      # Phase 1 migration validation
+      - name: Validate Phase 1 migration files
+        run: |
+          echo "Checking Phase 1 migration files..."
+
+          test -d poc/phase1/migrations
+          test -f poc/phase1/tests/test_migration.sql
+
+          test -f poc/phase1/migrations/V1__create_dummy_table.sql
+          test -f poc/phase1/migrations/V2__create_test_table.sql
+
+          if find poc/phase1/migrations -type f -name "*.sql" -empty | grep -q .; then
+            echo "An empty migration file was found."
+            exit 1
+          fi
+
+          echo "Phase 1 migration files verified."
+
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
@@ -104,3 +122,34 @@ jobs:
             -d saayam_test \
             -v ON_ERROR_STOP=1 \
             -f ddl/Tables/Scripts/ireland_dev_saayam_rdbms.sql
+
+      # Phase 1: Execute Flyway migrations
+      - name: Run Phase 1 Flyway migrations
+        run: |
+          echo "Starting Phase 1 Flyway migrations..."
+
+          docker run --rm \
+            --network host \
+            -v "$GITHUB_WORKSPACE/poc/phase1/migrations:/flyway/sql:ro" \
+            redgate/flyway:latest \
+            -url=jdbc:postgresql://localhost:5432/saayam_test \
+            -user=postgres \
+            -password=postgres \
+            -locations=filesystem:/flyway/sql \
+            migrate
+
+      # Phase 1: Verify database migrations
+      - name: Run Phase 1 migration verification tests
+        env:
+          PGPASSWORD: postgres
+        run: |
+          echo "Running Phase 1 migration verification..."
+
+          psql \
+            -h localhost \
+            -U postgres \
+            -d saayam_test \
+            -v ON_ERROR_STOP=1 \
+            -f poc/phase1/tests/test_migration.sql
+
+          echo "Phase 1 migration verification passed!"
